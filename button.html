@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Mode — cursor-chasing border + click burst</title>
+<style>
+  @property --angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+  }
+
+  :root {
+    --c1: #FF6B6B;
+    --c2: #FFD93D;
+    --c3: #6BCB77;
+    --c4: #4D96FF;
+    --c5: #B983FF;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f3f4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  .stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+  }
+
+  .pill-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .icon-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid #dcdfe3;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #5f6368;
+    cursor: pointer;
+  }
+
+  /* --- the interactive piece --- */
+
+  .ai-mode-wrap {
+    position: relative;
+  }
+
+  .ai-mode-wrap.pressed {
+    animation: press-bounce 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes press-bounce {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(0.9); }
+    65%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
+  }
+
+  .ai-mode-glow {
+    position: absolute;
+    inset: -6px;
+    border-radius: 999px;
+    background: conic-gradient(from var(--angle), var(--c1), var(--c2), var(--c3), var(--c4), var(--c5), var(--c1));
+    filter: blur(14px);
+    opacity: 0.55;
+    transition: --angle 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, filter 0.3s ease;
+    z-index: 0;
+  }
+
+  .ai-mode-glow.flash {
+    opacity: 0.95;
+    filter: blur(20px);
+  }
+
+  .ai-mode-btn {
+    position: relative;
+    z-index: 1;
+    border: none;
+    padding: 1.6px;
+    border-radius: 999px;
+    cursor: pointer;
+    background: conic-gradient(from var(--angle), var(--c1), var(--c2), var(--c3), var(--c4), var(--c5), var(--c1));
+    transition: --angle 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .ai-mode-btn__inner {
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: #ffffff;
+    border-radius: 999px;
+    padding: 10px 18px 10px 14px;
+    font-size: 14px;
+    font-weight: 500;
+    color: #1f1f1f;
+  }
+
+  .ai-mode-btn__inner svg {
+    flex-shrink: 0;
+  }
+
+  .spark {
+    transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .spark.spin {
+    transform: rotate(360deg) scale(1.15);
+  }
+
+  /* click ripple, clipped inside the pill */
+  .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 45%, rgba(255,255,255,0) 72%);
+    transform: translate(-50%, -50%) scale(0);
+    pointer-events: none;
+    animation: ripple-out 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes ripple-out {
+    to {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 0;
+    }
+  }
+
+  /* sparkle burst, flies out above everything */
+  .particle-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 4;
+  }
+
+  .particle {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    animation: particle-fly 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  @keyframes particle-fly {
+    to {
+      transform: translate(var(--tx), var(--ty)) scale(0.2);
+      opacity: 0;
+    }
+  }
+
+  /* idle animation runs until the visitor moves the mouse */
+  .ai-mode-wrap.idle .ai-mode-btn,
+  .ai-mode-wrap.idle .ai-mode-glow {
+    animation: spin 5s linear infinite;
+    transition: none;
+  }
+
+  @keyframes spin {
+    to { --angle: 360deg; }
+  }
+
+  .hint {
+    font-size: 13px;
+    color: #80868b;
+    margin: 0;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+  <div class="stage">
+    <div class="pill-group">
+      <button class="icon-btn" aria-label="Search by image">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8V6a2 2 0 0 1 2-2h2"/>
+          <path d="M16 4h2a2 2 0 0 1 2 2v2"/>
+          <path d="M20 16v2a2 2 0 0 1-2 2h-2"/>
+          <path d="M8 20H6a2 2 0 0 1-2-2v-2"/>
+          <circle cx="12" cy="12" r="3.2"/>
+        </svg>
+      </button>
+
+      <div class="ai-mode-wrap idle" id="aiWrap">
+        <div class="ai-mode-glow" id="aiGlow"></div>
+        <button class="ai-mode-btn" id="aiBtn">
+          <span class="ai-mode-btn__inner" id="aiInner">
+            <svg class="spark" id="aiSpark" width="15" height="15" viewBox="0 0 24 24" fill="#4D96FF">
+              <path d="M12 2c.3 3.6 1 6 2.6 7.6C16.2 11.2 18.6 11.9 22 12.2c-3.6.3-6 1-7.6 2.6-1.6 1.6-2.3 4-2.6 7.4-.3-3.6-1-6-2.6-7.6C7.6 12.8 5.2 12.1 1.8 11.8c3.6-.3 6-1 7.6-2.6C11 7.6 11.7 5.2 12 2z"/>
+            </svg>
+            <span>AI Mode</span>
+          </span>
+        </button>
+        <span class="particle-layer" id="particleLayer"></span>
+      </div>
+    </div>
+
+    <p class="hint">Move your mouse near the button to make the border chase it —<br>click it for a burst.</p>
+  </div>
+
+<script>
+  const wrap = document.getElementById('aiWrap');
+  const btn = document.getElementById('aiBtn');
+  const glow = document.getElementById('aiGlow');
+  const inner = document.getElementById('aiInner');
+  const spark = document.getElementById('aiSpark');
+  const particleLayer = document.getElementById('particleLayer');
+
+  const palette = ['#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#B983FF'];
+
+  let current = 0;      // unwrapped running angle, keeps rotation continuous
+  let idleTimer = null;
+
+  function setAngle(deg) {
+    btn.style.setProperty('--angle', deg + 'deg');
+    glow.style.setProperty('--angle', deg + 'deg');
+  }
+
+  function shortestDelta(target, from) {
+    let d = (target - from) % 360;
+    if (d > 180) d -= 360;
+    if (d < -180) d += 360;
+    return d;
+  }
+
+  function handleMove(e) {
+    const rect = btn.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const target = (Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI) + 90;
+
+    current += shortestDelta(target, current % 360);
+    setAngle(current);
+
+    wrap.classList.remove('idle');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => wrap.classList.add('idle'), 3500);
+  }
+
+  window.addEventListener('mousemove', handleMove);
+
+  // --- click burst ---
+
+  function spawnRipple(x, y) {
+    const rect = inner.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 1.9;
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple';
+    ripple.style.width = size + 'px';
+    ripple.style.height = size + 'px';
+    ripple.style.left = (x - rect.left) + 'px';
+    ripple.style.top = (y - rect.top) + 'px';
+    inner.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove());
+  }
+
+  function spawnParticles(x, y) {
+    const rect = wrap.getBoundingClientRect();
+    const originX = x - rect.left;
+    const originY = y - rect.top;
+    const count = 10;
+
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('span');
+      p.className = 'particle';
+      const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.6 - 0.3);
+      const dist = 30 + Math.random() * 26;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      const size = 4 + Math.random() * 4;
+      const color = palette[i % palette.length];
+
+      p.style.setProperty('--tx', tx + 'px');
+      p.style.setProperty('--ty', ty + 'px');
+      p.style.left = originX + 'px';
+      p.style.top = originY + 'px';
+      p.style.width = size + 'px';
+      p.style.height = size + 'px';
+      p.style.background = color;
+      p.style.boxShadow = '0 0 6px ' + color;
+      p.style.animationDelay = (Math.random() * 0.05) + 's';
+
+      particleLayer.appendChild(p);
+      p.addEventListener('animationend', () => p.remove());
+    }
+  }
+
+  function handleClick(e) {
+    spawnRipple(e.clientX, e.clientY);
+    spawnParticles(e.clientX, e.clientY);
+
+    wrap.classList.remove('pressed');
+    void wrap.offsetWidth; // restart animation on repeat clicks
+    wrap.classList.add('pressed');
+
+    glow.classList.add('flash');
+    setTimeout(() => glow.classList.remove('flash'), 320);
+
+    spark.classList.remove('spin');
+    void spark.offsetWidth;
+    spark.classList.add('spin');
+    setTimeout(() => spark.classList.remove('spin'), 650);
+  }
+
+  btn.addEventListener('click', handleClick);
+</script>
+
+</body>
+</html>
